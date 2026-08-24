@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "demo-plugin",
+  "version": "0.1.0",
+  "description": "A short description of what this plugin does.",
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": ["agent-plugins"]
+}
