@@ -2,6 +2,8 @@
 
 > A fast validator and scaffolding CLI for the [Agent Plugins 1.0](https://agent-plugins.org) open standard.
 
+[English](README.md) | [中文](README_zh.md)
+
 [![CI](https://github.com/yourname/plugcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/plugcheck/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
