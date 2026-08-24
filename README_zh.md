@@ -92,14 +92,21 @@ plugcheck check --format json
 
 ## 在 CI 中使用
 
+开箱即用的 GitHub Action：
+
+```yaml
+- uses: Zc-scarecrow/plugcheck-action@v1
+```
+
+全部选项（`path`、`version`、`format`、`args`）见
+[plugcheck-action](https://github.com/Zc-scarecrow/plugcheck-action)。也可以直接运行 CLI：
+
 ```yaml
 - name: Validate plugin
   run: |
     cargo install plugcheck
     plugcheck check --format json
 ```
-
-专用的 GitHub Action 已在路线图中。
 
 ## 为什么做 plugcheck？
 
@@ -111,7 +118,6 @@ linter、也没有脚手架工具。开发者手写 manifest，往往要到客�
 
 - [ ] `plugcheck pack` — 将插件打包为可分发的压缩包
 - [ ] `plugcheck watch` — 文件变更时自动重新校验
-- [ ] 一行接入 CI 的 GitHub Action
 - [ ] 兼容性矩阵检查（你的传输类型被哪些客户端支持）
 - [ ] 插件模板仓库（`plugcheck new` 支持社区模板）
 

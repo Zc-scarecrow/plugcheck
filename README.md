@@ -94,14 +94,21 @@ by `plugcheck new demo-plugin` and is re-validated on every CI run.
 
 ## Use in CI
 
+Drop-in GitHub Action:
+
+```yaml
+- uses: Zc-scarecrow/plugcheck-action@v1
+```
+
+See [plugcheck-action](https://github.com/Zc-scarecrow/plugcheck-action) for all
+options (`path`, `version`, `format`, `args`). Or run the CLI directly:
+
 ```yaml
 - name: Validate plugin
   run: |
     cargo install plugcheck
     plugcheck check --format json
 ```
-
-A dedicated GitHub Action is on the roadmap.
 
 ## Why plugcheck?
 
@@ -115,7 +122,6 @@ you share it.
 
 - [ ] `plugcheck pack` — bundle a plugin into a distributable archive
 - [ ] `plugcheck watch` — re-check on file changes
-- [ ] GitHub Action for one-line CI integration
 - [ ] Compatibility matrix checks (which clients support your transports)
 - [ ] Plugin template registry (`plugcheck new` with community templates)
 
