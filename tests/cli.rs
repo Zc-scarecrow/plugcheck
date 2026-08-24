@@ -124,3 +124,208 @@ fn json_output_reports_invalid() {
     assert_eq!(parsed["valid"], false);
     assert!(parsed["summary"]["errors"].as_u64().unwrap() >= 1);
 }
+
+// ---------------------------------------------------------------------------
+// Additional edge-case scenarios
+// ---------------------------------------------------------------------------
+
+fn write_valid_plugin(dir: &std::path::Path) {
+    fs::create_dir_all(dir).unwrap();
+    fs::write(
+        dir.join("plugin.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"test-plugin"}"#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn new_into_existing_directory_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::create_dir(tmp.path().join("demo")).unwrap();
+    let out = run(&["new", "demo", "--dir", "demo"], tmp.path());
+    assert!(!out.status.success());
+}
+
+#[test]
+fn check_non_directory_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("not-a-dir");
+    fs::write(&file, "hi").unwrap();
+    let out = run(&["check", "not-a-dir"], tmp.path());
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("not a directory"), "output: {}", stdout);
+}
+
+#[test]
+fn malformed_plugin_json_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::write(tmp.path().join("plugin.json"), "{ this is not json").unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("invalid JSON"), "output: {}", stdout);
+}
+
+#[test]
+fn malformed_mcp_json_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(tmp.path().join("mcp.json"), "not json").unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("invalid JSON"), "output: {}", stdout);
+}
+
+#[test]
+fn empty_skills_dir_passes() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::create_dir(tmp.path().join("skills")).unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("0 skills checked"), "output: {}", stdout);
+}
+
+#[test]
+fn subdir_without_skill_md_is_warning() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::create_dir_all(tmp.path().join("skills").join("no-skill")).unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("does not contain SKILL.md"),
+        "output: {}",
+        stdout
+    );
+}
+
+#[test]
+fn regular_files_in_skills_are_ignored() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    let skills = tmp.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    fs::write(skills.join("README.txt"), "ignore me").unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+}
+
+#[test]
+fn dotted_name_is_valid() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(&["new", "acme.analytics", "--dir", "dot"], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+    let out = run(&["check"], &tmp.path().join("dot"));
+    assert!(out.status.success());
+}
+
+#[test]
+fn repeated_checks_are_idempotent() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::create_dir_all(tmp.path().join("skills").join("ok")).unwrap();
+    fs::write(
+        tmp.path().join("skills").join("ok").join("SKILL.md"),
+        "---\nname: ok\ndescription: fine\n---\n",
+    )
+    .unwrap();
+    let first = run(&["check"], tmp.path());
+    let second = run(&["check"], tmp.path());
+    assert_eq!(first.status.code(), second.status.code());
+    assert_eq!(first.stdout, second.stdout);
+}
+
+#[test]
+fn json_output_marks_warning_only_plugin_valid() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    let out = run(&["check", "--format", "json"], tmp.path());
+    assert!(out.status.success());
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stdout must be valid JSON");
+    assert_eq!(parsed["valid"], true);
+    assert!(parsed["summary"]["warnings"].as_u64().unwrap() >= 1);
+}
+
+#[test]
+fn sse_server_missing_url_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(
+        tmp.path().join("mcp.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"s":{"type":"sse"}}}"#,
+    )
+    .unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("url"), "output: {}", stdout);
+}
+
+#[test]
+fn unknown_transport_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(
+        tmp.path().join("mcp.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"s":{"type":"websocket","url":"ws://x"}}}"#,
+    )
+    .unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("unknown transport"), "output: {}", stdout);
+}
+
+#[test]
+fn mcp_servers_array_is_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(
+        tmp.path().join("mcp.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":[1]}"#,
+    )
+    .unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(!out.status.success());
+}
+
+#[test]
+fn stress_many_skills() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    let skills = tmp.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    let n = 300;
+    for i in 0..n {
+        let dir = skills.join(format!("skill-{}", i));
+        fs::create_dir(&dir).unwrap();
+        fs::write(
+            dir.join("SKILL.md"),
+            format!("---\nname: skill-{}\ndescription: s\n---\n", i),
+        )
+        .unwrap();
+    }
+    let out = run(&["check"], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("300 skills checked"), "output: {}", stdout);
+}
+
+#[test]
+fn stdio_server_with_command_and_args_passes() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(
+        tmp.path().join("mcp.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"s":{"type":"stdio","command":"./bin/s","args":["--data","${PLUGIN_DATA}/s"]}}}"#,
+    )
+    .unwrap();
+    let out = run(&["check"], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+}

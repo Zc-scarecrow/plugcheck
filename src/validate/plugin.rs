@@ -223,4 +223,100 @@ mod tests {
             parse_schema_version("https://agent-plugins.org/schemas//plugin.schema.json").is_err()
         );
     }
+
+    #[test]
+    fn name_edge_cases() {
+        // valid single characters, digit-leading names, multi-segment dotted names
+        assert!(validate_name("a").is_ok());
+        assert!(validate_name("3d").is_ok());
+        assert!(validate_name("a.b.c").is_ok());
+        assert!(validate_name("x1-y2.z3").is_ok());
+        // invalid: empty, punctuation at edges, repeated punctuation
+        assert!(validate_name("").is_err());
+        assert!(validate_name("a-").is_err());
+        assert!(validate_name("-a").is_err());
+        assert!(validate_name("a.").is_err());
+        assert!(validate_name(".a").is_err());
+        // invalid: unicode letters are not allowed
+        assert!(validate_name("aé").is_err());
+    }
+
+    #[test]
+    fn full_valid_manifest_returns_version() {
+        let v: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+                "name": "ok-plugin",
+                "version": "1.2.3",
+                "description": "hi",
+                "keywords": ["a", "b"],
+                "extensions": { "com.acme.x": { "n": 1 } }
+            }"#,
+        )
+        .unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        assert_eq!(check_plugin_json(&mut r, &v).as_deref(), Some("1.0.0"));
+        assert!(r.ok(), "diagnostics: {:?}", r.diagnostics);
+    }
+
+    #[test]
+    fn manifest_missing_name_is_error() {
+        let v: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"}"#,
+        )
+        .unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        check_plugin_json(&mut r, &v);
+        assert_eq!(r.errors(), 1);
+        assert!(r.diagnostics[0].message.contains("name"));
+    }
+
+    #[test]
+    fn manifest_bad_schema_url_is_error() {
+        let v: Value =
+            serde_json::from_str(r#"{"$schema":"https://evil.com/x.json","name":"ok"}"#).unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        assert_eq!(check_plugin_json(&mut r, &v), None);
+        assert!(r.errors() >= 1);
+    }
+
+    #[test]
+    fn extensions_must_be_object() {
+        let v: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"ok","extensions":42}"#,
+        )
+        .unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        check_plugin_json(&mut r, &v);
+        assert_eq!(r.errors(), 1);
+        assert!(r.diagnostics[0].message.contains("extensions"));
+    }
+
+    #[test]
+    fn root_not_object_is_error() {
+        let v = Value::Array(vec![]);
+        let mut r = Report::new(std::path::Path::new("."));
+        assert_eq!(check_plugin_json(&mut r, &v), None);
+        assert_eq!(r.errors(), 1);
+    }
+
+    /// Robustness test: deterministic pseudo-random garbage must never panic
+    /// the manifest validator, whether it parses as JSON or not.
+    #[test]
+    fn malformed_input_never_panics() {
+        let mut seed: u64 = 0xDEAD_BEEF;
+        for _ in 0..500 {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let len = (seed % 128) as usize;
+            let bytes: Vec<u8> = (0..len).map(|i| (seed >> (i % 32)) as u8).collect();
+            if let Ok(text) = String::from_utf8(bytes)
+                && let Ok(v) = serde_json::from_str::<Value>(&text)
+            {
+                let mut r = Report::new(std::path::Path::new("."));
+                check_plugin_json(&mut r, &v); // must not panic
+            }
+        }
+    }
 }

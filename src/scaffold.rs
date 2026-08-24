@@ -154,3 +154,65 @@ fn write(dir: &Path, rel: &str, content: &str) -> io::Result<()> {
     }
     fs::write(path, content)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate::{check_plugin_dir, skills::Frontmatter};
+
+    /// Dogfood test: a scaffolded plugin must pass plugcheck's own validator.
+    #[test]
+    fn scaffolded_plugin_passes_own_validator() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("demo");
+        scaffold("demo-plugin", &dir).unwrap();
+        let (report, skills) = check_plugin_dir(&dir);
+        assert!(report.ok(), "diagnostics: {:?}", report.diagnostics);
+        assert_eq!(skills, 1);
+    }
+
+    #[test]
+    fn rejects_existing_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("existing");
+        fs::create_dir(&dir).unwrap();
+        match scaffold("x-plugin", &dir) {
+            Err(ScaffoldError::Io(_)) => {}
+            other => panic!("expected Io error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_names() {
+        let tmp = tempfile::tempdir().unwrap();
+        for bad in ["Bad", "under_score", "-lead", "trail-", "a..b", "a--b", ""] {
+            assert!(
+                scaffold(bad, &tmp.path().join("x")).is_err(),
+                "name {:?} should be rejected",
+                bad
+            );
+        }
+    }
+
+    #[test]
+    fn templates_are_valid_json() {
+        for text in [plugin_json("acme.analytics"), mcp_json()] {
+            serde_json::from_str::<serde_json::Value>(&text).unwrap();
+        }
+    }
+
+    #[test]
+    fn skill_template_has_valid_frontmatter() {
+        let skill = skill_md("acme.analytics");
+        let fm = Frontmatter::parse(&skill).expect("template must have frontmatter");
+        assert_eq!(fm.get("name"), Some("acme.analytics-example"));
+        assert!(fm.get("description").is_some());
+    }
+
+    #[test]
+    fn readme_template_mentions_plugin_name() {
+        let readme = readme_md("cool-plugin");
+        assert!(readme.contains("cool-plugin"));
+        assert!(readme.contains("plugcheck check"));
+    }
+}

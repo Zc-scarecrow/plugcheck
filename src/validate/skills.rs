@@ -159,4 +159,42 @@ mod tests {
         assert!(Frontmatter::parse("name: x\n---\nbody").is_none());
         assert!(Frontmatter::parse("---\nname: x").is_none()); // never closed
     }
+
+    #[test]
+    fn handles_quoted_values() {
+        let content = "---\nname: 'single'\ndescription: \"double quoted\"\n---\n";
+        let fm = Frontmatter::parse(content).unwrap();
+        assert_eq!(fm.get("name"), Some("single"));
+        assert_eq!(fm.get("description"), Some("double quoted"));
+    }
+
+    #[test]
+    fn keeps_colons_inside_values() {
+        let content = "---\nname: x\nlink: https://example.com/path\n---\n";
+        let fm = Frontmatter::parse(content).unwrap();
+        assert_eq!(fm.get("link"), Some("https://example.com/path"));
+    }
+
+    #[test]
+    fn skips_comments_and_blank_lines() {
+        let content = "---\n# a comment\n\nname: x\n---\n";
+        let fm = Frontmatter::parse(content).unwrap();
+        assert_eq!(fm.fields.len(), 1);
+        assert_eq!(fm.get("name"), Some("x"));
+    }
+
+    #[test]
+    fn ignores_lines_without_colon() {
+        let content = "---\nno-colon-here\nname: x\n---\n";
+        let fm = Frontmatter::parse(content).unwrap();
+        assert_eq!(fm.get("name"), Some("x"));
+        assert_eq!(fm.fields.len(), 1);
+    }
+
+    #[test]
+    fn get_returns_none_for_absent_key() {
+        let content = "---\nname: x\n---\n";
+        let fm = Frontmatter::parse(content).unwrap();
+        assert_eq!(fm.get("description"), None);
+    }
 }

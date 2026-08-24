@@ -203,4 +203,127 @@ mod tests {
         check_mcp_json(&mut r, &json, Some("1.0.0"));
         assert_eq!(r.errors(), 1);
     }
+
+    #[test]
+    fn sse_requires_url() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                "mcpServers": { "broken": { "type": "sse" } }
+            }"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+        assert!(r.diagnostics[0].message.contains("url"));
+    }
+
+    #[test]
+    fn unknown_transport_is_error() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                "mcpServers": { "x": { "type": "websocket", "url": "ws://x" } }
+            }"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+        assert!(r.diagnostics[0].message.contains("unknown transport"));
+    }
+
+    #[test]
+    fn mcp_servers_must_be_object() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                "mcpServers": [1, 2]
+            }"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+    }
+
+    #[test]
+    fn server_spec_must_be_object() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                "mcpServers": { "x": "not-an-object" }
+            }"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+    }
+
+    #[test]
+    fn missing_type_is_error() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                "mcpServers": { "x": { "command": "./x" } }
+            }"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+        assert!(r.diagnostics[0].message.contains("type"));
+    }
+
+    #[test]
+    fn missing_servers_is_warning_only() {
+        let json: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"}"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, Some("1.0.0"));
+        assert!(r.ok());
+        assert_eq!(r.warnings(), 1);
+    }
+
+    #[test]
+    fn root_not_object_is_error() {
+        let mut r = report();
+        check_mcp_json(&mut r, &Value::Null, Some("1.0.0"));
+        assert_eq!(r.errors(), 1);
+    }
+
+    #[test]
+    fn silent_when_plugin_version_unknown() {
+        let json: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{}}"#,
+        )
+        .unwrap();
+        let mut r = report();
+        check_mcp_json(&mut r, &json, None);
+        assert!(r.ok());
+    }
+
+    /// Robustness test: deterministic pseudo-random garbage must never panic
+    /// the MCP validator, whether it parses as JSON or not.
+    #[test]
+    fn malformed_input_never_panics() {
+        let mut seed: u64 = 0xCAFE_BABE;
+        for _ in 0..500 {
+            seed = seed
+                .wrapping_mul(2862933555777941757)
+                .wrapping_add(3037000493);
+            let len = (seed % 128) as usize;
+            let bytes: Vec<u8> = (0..len).map(|i| (seed >> (i % 32)) as u8).collect();
+            if let Ok(text) = String::from_utf8(bytes)
+                && let Ok(v) = serde_json::from_str::<Value>(&text)
+            {
+                let mut r = report();
+                check_mcp_json(&mut r, &v, Some("1.0.0")); // must not panic
+            }
+        }
+    }
 }

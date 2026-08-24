@@ -151,3 +151,70 @@ impl Report {
         serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn human_output_has_markers_and_hints() {
+        let mut r = Report::new(Path::new("."));
+        r.push(Diagnostic::error("plugin.json", "boom"));
+        r.push(Diagnostic::warning("mcp.json", "hmm").with_hint("try X"));
+        let out = r.render_human(3);
+        assert!(out.contains("error: plugin.json: boom"), "{}", out);
+        assert!(out.contains("warning: mcp.json: hmm"), "{}", out);
+        assert!(out.contains("hint: try X"), "{}", out);
+        assert!(
+            out.contains("2 problem(s) found (1 error(s), 1 warning(s), 3 skills checked)"),
+            "{}",
+            out
+        );
+    }
+
+    #[test]
+    fn human_output_clean_case() {
+        let r = Report::new(Path::new("."));
+        let out = r.render_human(2);
+        assert!(
+            out.contains("no problems found (2 skills checked)"),
+            "{}",
+            out
+        );
+    }
+
+    #[test]
+    fn json_output_shape() {
+        let mut r = Report::new(Path::new("/tmp/x"));
+        r.push(Diagnostic::error("a.json", "bad"));
+        let json = r.render_json(0);
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["tool"], "plugcheck");
+        assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(v["valid"], false);
+        assert_eq!(v["summary"]["errors"], 1);
+        assert_eq!(v["diagnostics"][0]["severity"], "error");
+        assert_eq!(v["diagnostics"][0]["file"], "a.json");
+    }
+
+    #[test]
+    fn json_output_omits_hint_when_absent() {
+        let mut r = Report::new(Path::new("."));
+        r.push(Diagnostic::warning("x", "w"));
+        let json = r.render_json(0);
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(v["diagnostics"][0].get("hint").is_none());
+    }
+
+    #[test]
+    fn ok_flag_reflects_only_errors() {
+        let mut r = Report::new(Path::new("."));
+        r.push(Diagnostic::warning("x", "w"));
+        assert!(r.ok());
+        r.push(Diagnostic::error("y", "e"));
+        assert!(!r.ok());
+        assert_eq!(r.errors(), 1);
+        assert_eq!(r.warnings(), 1);
+    }
+}
