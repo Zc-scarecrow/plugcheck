@@ -7,7 +7,7 @@ is always: **read the relevant part of the spec**.
 ## Setup
 
 ```sh
-git clone https://github.com/yourname/plugcheck.git
+git clone https://github.com/Zc-scarecrow/plugcheck.git
 cd plugcheck
 cargo build
 cargo test

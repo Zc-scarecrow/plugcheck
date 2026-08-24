@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-[![CI](https://github.com/yourname/plugcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/plugcheck/actions/workflows/ci.yml)
+[![CI](https://github.com/Zc-scarecrow/plugcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Zc-scarecrow/plugcheck/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **plugcheck** 用于校验和生成可移植的 Agent 插件——一次打包，即可运行于 VS Code、Cursor、
@@ -20,7 +20,7 @@ GitHub Copilot、ChatGPT & Codex、Kiro 等所有实现 Agent Plugins 1.0 标准
 
 ### 预编译二进制
 
-从 [Releases](https://github.com/yourname/plugcheck/releases) 下载对应平台的二进制，或使用：
+从 [Releases](https://github.com/Zc-scarecrow/plugcheck/releases) 下载对应平台的二进制，或使用：
 
 ```sh
 cargo install plugcheck

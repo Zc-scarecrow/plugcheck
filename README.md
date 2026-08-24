@@ -4,7 +4,7 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-[![CI](https://github.com/yourname/plugcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/plugcheck/actions/workflows/ci.yml)
+[![CI](https://github.com/Zc-scarecrow/plugcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Zc-scarecrow/plugcheck/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **plugcheck** validates and scaffolds portable agent plugins — one package that runs across
@@ -22,7 +22,7 @@ Agent Plugins 1.0 standard.
 ### Prebuilt binaries
 
 Download the latest binary for your platform from
-[Releases](https://github.com/yourname/plugcheck/releases), or install with:
+[Releases](https://github.com/Zc-scarecrow/plugcheck/releases), or install with:
 
 ```sh
 cargo install plugcheck
