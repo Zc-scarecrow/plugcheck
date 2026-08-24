@@ -1,1 +1,4 @@
 /target
+
+# separate project developed alongside this repo
+/plugcheck-action
