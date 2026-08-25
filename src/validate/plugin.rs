@@ -131,6 +131,19 @@ pub fn check_plugin_json(report: &mut Report, value: &Value) -> Option<String> {
         ));
     }
 
+    // --- recommended optional fields ---
+    for field in ["version", "description", "license"] {
+        if !obj.contains_key(field) {
+            report.push(Diagnostic::warning(
+                "plugin.json",
+                format!(
+                    "optional field `{}` is not set (recommended before distribution)",
+                    field
+                ),
+            ));
+        }
+    }
+
     Some(version)
 }
 
@@ -318,5 +331,23 @@ mod tests {
                 check_plugin_json(&mut r, &v); // must not panic
             }
         }
+    }
+
+    #[test]
+    fn missing_recommended_fields_are_warnings() {
+        let v: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"ok"}"#,
+        )
+        .unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        check_plugin_json(&mut r, &v);
+        assert!(r.ok());
+        let warnings: Vec<_> = r
+            .diagnostics
+            .iter()
+            .filter(|d| d.severity == crate::report::Severity::Warning)
+            .collect();
+        assert_eq!(warnings.len(), 3, "diagnostics: {:?}", r.diagnostics);
+        assert!(warnings.iter().any(|d| d.message.contains("`version`")));
     }
 }

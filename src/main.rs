@@ -18,8 +18,8 @@ fn main() -> ExitCode {
         Command::Check {
             path,
             format,
-            verbose: _,
-        } => run_check(path, format),
+            verbose,
+        } => run_check(path, format, verbose),
     }
 }
 
@@ -45,7 +45,7 @@ fn run_new(name: &str, dir: Option<String>) -> ExitCode {
     }
 }
 
-fn run_check(path: Option<String>, format: Format) -> ExitCode {
+fn run_check(path: Option<String>, format: Format, verbose: bool) -> ExitCode {
     let root = match path {
         Some(p) => PathBuf::from(p),
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -54,8 +54,8 @@ fn run_check(path: Option<String>, format: Format) -> ExitCode {
     let (report, skills_checked) = validate::check_plugin_dir(&root);
 
     let output = match format {
-        Format::Human => report.render_human(skills_checked),
-        Format::Json => report.render_json(skills_checked),
+        Format::Human => report.render_human(skills_checked, verbose),
+        Format::Json => report.render_json(skills_checked, verbose),
     };
     print!("{}", output);
 

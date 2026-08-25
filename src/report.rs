@@ -90,7 +90,7 @@ pub struct JsonReport<'a> {
     pub plugin_root: &'a str,
     pub valid: bool,
     pub summary: Summary,
-    pub diagnostics: &'a [Diagnostic],
+    pub diagnostics: Vec<&'a Diagnostic>,
 }
 
 #[derive(Debug, Serialize)]
@@ -102,7 +102,8 @@ pub struct Summary {
 
 impl Report {
     /// Render the report as human-readable text.
-    pub fn render_human(&self, skills_checked: usize) -> String {
+    /// The `verbose` parameter is retained for API compatibility but currently unused.
+    pub fn render_human(&self, skills_checked: usize, _verbose: bool) -> String {
         let mut out = String::new();
         for d in &self.diagnostics {
             let marker = match d.severity {
@@ -134,7 +135,8 @@ impl Report {
     }
 
     /// Render the report as JSON.
-    pub fn render_json(&self, skills_checked: usize) -> String {
+    pub fn render_json(&self, skills_checked: usize, _verbose: bool) -> String {
+        // Note: --verbose flag is retained for API compatibility, but JSON output now includes all diagnostics.
         let plugin_root = self.root.to_string_lossy();
         let report = JsonReport {
             tool: "plugcheck",
@@ -146,7 +148,7 @@ impl Report {
                 warnings: self.warnings(),
                 skills_checked,
             },
-            diagnostics: &self.diagnostics,
+            diagnostics: self.diagnostics.iter().collect(),
         };
         serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
     }
@@ -162,7 +164,7 @@ mod tests {
         let mut r = Report::new(Path::new("."));
         r.push(Diagnostic::error("plugin.json", "boom"));
         r.push(Diagnostic::warning("mcp.json", "hmm").with_hint("try X"));
-        let out = r.render_human(3);
+        let out = r.render_human(3, false);
         assert!(out.contains("error: plugin.json: boom"), "{}", out);
         assert!(out.contains("warning: mcp.json: hmm"), "{}", out);
         assert!(out.contains("hint: try X"), "{}", out);
@@ -176,7 +178,7 @@ mod tests {
     #[test]
     fn human_output_clean_case() {
         let r = Report::new(Path::new("."));
-        let out = r.render_human(2);
+        let out = r.render_human(2, false);
         assert!(
             out.contains("no problems found (2 skills checked)"),
             "{}",
@@ -188,7 +190,7 @@ mod tests {
     fn json_output_shape() {
         let mut r = Report::new(Path::new("/tmp/x"));
         r.push(Diagnostic::error("a.json", "bad"));
-        let json = r.render_json(0);
+        let json = r.render_json(0, false);
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["tool"], "plugcheck");
         assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
@@ -202,7 +204,7 @@ mod tests {
     fn json_output_omits_hint_when_absent() {
         let mut r = Report::new(Path::new("."));
         r.push(Diagnostic::warning("x", "w"));
-        let json = r.render_json(0);
+        let json = r.render_json(0, false);
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(v["diagnostics"][0].get("hint").is_none());
     }
