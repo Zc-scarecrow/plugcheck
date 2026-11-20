@@ -147,6 +147,10 @@ linter、也没有脚手架工具。开发者手写 manifest，往往要到客�
 - [ ] 社区模板仓库（托管式）
 - [ ] 内置客户端能力数据库，实现真正的兼容性矩阵检查
 
+## 常见问题
+
+关于规范、警告、打包与 CI 的常见问答：[docs/FAQ.md](docs/FAQ.md)
+
 ## 参与贡献
 
 欢迎贡献。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，再提交 issue 或 PR。

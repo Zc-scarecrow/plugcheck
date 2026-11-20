@@ -152,6 +152,10 @@ you share it.
 - [ ] Hosted community template registry
 - [ ] Bundled client capability database for true compatibility matrix checks
 
+## FAQ
+
+Common questions about the spec, warnings, packaging and CI: [docs/FAQ.md](docs/FAQ.md)
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue
