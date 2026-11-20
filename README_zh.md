@@ -123,14 +123,7 @@ plugcheck new my-plugin --template ./templates/basic
 
 ## 在 CI 中使用
 
-开箱即用的 GitHub Action：
-
-```yaml
-- uses: Zc-scarecrow/plugcheck-action@v1
-```
-
-全部选项（`path`、`version`、`format`、`args`）见
-[plugcheck-action](https://github.com/Zc-scarecrow/plugcheck-action)。也可以直接运行 CLI：
+在任意 CI 系统中直接运行 CLI：
 
 ```yaml
 - name: Validate plugin

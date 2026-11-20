@@ -349,7 +349,17 @@ fn json_verbose_includes_info_diagnostics() {
     write_valid_plugin(tmp.path());
     let out = run(&["check", "--format", "json", "--verbose"], tmp.path());
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["diagnostics"][0]["severity"], "info");
+    let severities: Vec<&str> = v["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|d| d["severity"].as_str())
+        .collect();
+    assert!(
+        severities.contains(&"info"),
+        "diagnostics: {:?}",
+        severities
+    );
 }
 
 #[test]

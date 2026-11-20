@@ -126,14 +126,7 @@ by `plugcheck new demo-plugin` and is re-validated on every CI run.
 
 ## Use in CI
 
-Drop-in GitHub Action:
-
-```yaml
-- uses: Zc-scarecrow/plugcheck-action@v1
-```
-
-See [plugcheck-action](https://github.com/Zc-scarecrow/plugcheck-action) for all
-options (`path`, `version`, `format`, `args`). Or run the CLI directly:
+Run the CLI directly in any CI system:
 
 ```yaml
 - name: Validate plugin
