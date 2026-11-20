@@ -73,7 +73,7 @@ plugcheck check --format json
 ```json
 {
   "tool": "plugcheck",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "plugin_root": "my-plugin",
   "valid": true,
   "summary": {

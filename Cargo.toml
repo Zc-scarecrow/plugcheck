@@ -1,6 +1,6 @@
 [package]
 name = "plugcheck"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "A fast validator and scaffolding CLI for the Agent Plugins 1.0 open standard"
