@@ -56,6 +56,12 @@ Next steps:
 plugcheck check /path/to/plugin
 ```
 
+同时显示提示性信息：
+
+```sh
+plugcheck check --verbose
+```
+
 获取机器可读输出：
 
 ```sh
@@ -65,7 +71,7 @@ plugcheck check --format json
 ```json
 {
   "tool": "plugcheck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "plugin_root": "my-plugin",
   "valid": true,
   "summary": {
@@ -77,7 +83,32 @@ plugcheck check --format json
 }
 ```
 
-插件有效时退出码为 `0`，否则为 `1`。
+插件有效时退出码为 `0`，否则为 `1`。提示性信息（`--verbose` 显示）不影响退出码。
+
+将插件打包为可分发的 ZIP 压缩包（排除 `.git`、`target`、`node_modules`
+和 `*.log`；压缩包不压缩、内容可复现）：
+
+```sh
+plugcheck pack my-plugin -o my-plugin.zip
+```
+
+开发时自动重新校验（默认每 2 秒轮询一次）：
+
+```sh
+plugcheck watch my-plugin --interval 2
+```
+
+查看插件自声明的目标客户端与 MCP 传输类型：
+
+```sh
+plugcheck compat my-plugin --format json
+```
+
+从本地模板目录创建插件（文本文件中可用 `{{name}}` 占位符）：
+
+```sh
+plugcheck new my-plugin --template ./templates/basic
+```
 
 仓库中的 [`demo-plugin/`](demo-plugin) 是一个符合规范的示例——它由
 `plugcheck new demo-plugin` 生成，并在每次 CI 运行中重新校验。
@@ -116,10 +147,12 @@ linter、也没有脚手架工具。开发者手写 manifest，往往要到客�
 
 ## 路线图
 
-- [ ] `plugcheck pack` — 将插件打包为可分发的压缩包
-- [ ] `plugcheck watch` — 文件变更时自动重新校验
-- [ ] 兼容性矩阵检查（你的传输类型被哪些客户端支持）
-- [ ] 插件模板仓库（`plugcheck new` 支持社区模板）
+- [x] `plugcheck pack` — 将插件打包为可分发的压缩包
+- [x] `plugcheck watch` — 文件变更时自动重新校验
+- [x] `plugcheck compat` — 查看声明的客户端与 MCP 传输类型
+- [x] 本地插件模板（`plugcheck new --template <dir>`）
+- [ ] 社区模板仓库（托管式）
+- [ ] 内置客户端能力数据库，实现真正的兼容性矩阵检查
 
 ## 参与贡献
 

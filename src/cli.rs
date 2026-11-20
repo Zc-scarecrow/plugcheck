@@ -18,6 +18,10 @@ pub enum Command {
         /// Target directory (defaults to the plugin name)
         #[arg(long)]
         dir: Option<String>,
+
+        /// Local template directory (text files may use {{name}} placeholders)
+        #[arg(long)]
+        template: Option<String>,
     },
 
     /// Validate a plugin against the Agent Plugins 1.0 specification
@@ -32,6 +36,36 @@ pub enum Command {
         /// Also report informational findings
         #[arg(long)]
         verbose: bool,
+    },
+
+    /// Pack a plugin into a distributable ZIP archive
+    Pack {
+        /// Path to the plugin directory (defaults to the current directory)
+        path: Option<String>,
+
+        /// Output archive path (defaults to <plugin-dir-name>.zip)
+        #[arg(long, short)]
+        output: Option<String>,
+    },
+
+    /// Re-check a plugin whenever its files change
+    Watch {
+        /// Path to the plugin directory (defaults to the current directory)
+        path: Option<String>,
+
+        /// Polling interval in seconds
+        #[arg(long, default_value_t = 2)]
+        interval: u64,
+    },
+
+    /// Report declared client targets and MCP transports
+    Compat {
+        /// Path to the plugin directory (defaults to the current directory)
+        path: Option<String>,
+
+        /// Output format
+        #[arg(long, value_enum, default_value_t = Format::Human)]
+        format: Format,
     },
 }
 

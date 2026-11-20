@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 pub enum Severity {
     Error,
     Warning,
+    /// Informational finding, only shown with `--verbose`.
+    Info,
 }
 
 /// A single finding produced by validation.
@@ -32,6 +34,15 @@ impl Diagnostic {
     pub fn warning(file: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Warning,
+            file: file.into(),
+            message: message.into(),
+            hint: None,
+        }
+    }
+
+    pub fn info(file: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            severity: Severity::Info,
             file: file.into(),
             message: message.into(),
             hint: None,
@@ -78,6 +89,13 @@ impl Report {
             .count()
     }
 
+    pub fn infos(&self) -> usize {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Info)
+            .count()
+    }
+
     pub fn ok(&self) -> bool {
         self.errors() == 0
     }
@@ -102,13 +120,17 @@ pub struct Summary {
 
 impl Report {
     /// Render the report as human-readable text.
-    /// The `verbose` parameter is retained for API compatibility but currently unused.
-    pub fn render_human(&self, skills_checked: usize, _verbose: bool) -> String {
+    /// Informational findings are only emitted when `verbose` is set.
+    pub fn render_human(&self, skills_checked: usize, verbose: bool) -> String {
         let mut out = String::new();
         for d in &self.diagnostics {
+            if d.severity == Severity::Info && !verbose {
+                continue;
+            }
             let marker = match d.severity {
                 Severity::Error => "error",
                 Severity::Warning => "warning",
+                Severity::Info => "info",
             };
             out.push_str(&format!("{}: {}: {}\n", marker, d.file, d.message));
             if let Some(hint) = &d.hint {
@@ -131,12 +153,18 @@ impl Report {
                 skills_checked
             ));
         }
+        if verbose && self.infos() > 0 {
+            out.push_str(&format!(
+                "plugcheck: {} informational note(s)\n",
+                self.infos()
+            ));
+        }
         out
     }
 
-    /// Render the report as JSON.
-    pub fn render_json(&self, skills_checked: usize, _verbose: bool) -> String {
-        // Note: --verbose flag is retained for API compatibility, but JSON output now includes all diagnostics.
+    /// Render the report as JSON. Informational findings are only included
+    /// when `verbose` is set.
+    pub fn render_json(&self, skills_checked: usize, verbose: bool) -> String {
         let plugin_root = self.root.to_string_lossy();
         let report = JsonReport {
             tool: "plugcheck",
@@ -148,7 +176,11 @@ impl Report {
                 warnings: self.warnings(),
                 skills_checked,
             },
-            diagnostics: self.diagnostics.iter().collect(),
+            diagnostics: self
+                .diagnostics
+                .iter()
+                .filter(|d| verbose || d.severity != Severity::Info)
+                .collect(),
         };
         serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
     }
@@ -218,5 +250,28 @@ mod tests {
         assert!(!r.ok());
         assert_eq!(r.errors(), 1);
         assert_eq!(r.warnings(), 1);
+    }
+
+    #[test]
+    fn info_is_hidden_unless_verbose() {
+        let mut r = Report::new(Path::new("."));
+        r.push(Diagnostic::info("mcp.json", "not found"));
+        let quiet = r.render_human(0, false);
+        let loud = r.render_human(0, true);
+        assert!(!quiet.contains("info: mcp.json"), "{}", quiet);
+        assert!(loud.contains("info: mcp.json"), "{}", loud);
+        assert_eq!(r.infos(), 1);
+        assert!(r.ok(), "info must never fail validation");
+    }
+
+    #[test]
+    fn json_includes_info_only_when_verbose() {
+        let mut r = Report::new(Path::new("."));
+        r.push(Diagnostic::info("mcp.json", "not found"));
+        let quiet: serde_json::Value = serde_json::from_str(&r.render_json(0, false)).unwrap();
+        let loud: serde_json::Value = serde_json::from_str(&r.render_json(0, true)).unwrap();
+        assert_eq!(quiet["diagnostics"].as_array().unwrap().len(), 0);
+        assert_eq!(loud["diagnostics"].as_array().unwrap().len(), 1);
+        assert_eq!(loud["diagnostics"][0]["severity"], "info");
     }
 }

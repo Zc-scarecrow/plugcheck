@@ -329,3 +329,97 @@ fn stdio_server_with_command_and_args_passes() {
     let out = run(&["check"], tmp.path());
     assert!(out.status.success(), "output: {:?}", out);
 }
+
+#[test]
+fn verbose_reports_missing_mcp_info() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    let quiet = run(&["check"], tmp.path());
+    let loud = run(&["check", "--verbose"], tmp.path());
+    let q = String::from_utf8_lossy(&quiet.stdout);
+    let l = String::from_utf8_lossy(&loud.stdout);
+    assert!(!q.contains("info: mcp.json"), "{}", q);
+    assert!(l.contains("info: mcp.json"), "{}", l);
+    assert!(loud.status.success());
+}
+
+#[test]
+fn json_verbose_includes_info_diagnostics() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    let out = run(&["check", "--format", "json", "--verbose"], tmp.path());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["diagnostics"][0]["severity"], "info");
+}
+
+#[test]
+fn non_target_schema_version_is_warning() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::write(
+        tmp.path().join("plugin.json"),
+        r#"{"$schema":"https://agent-plugins.org/schemas/2.0.0/plugin.schema.json","name":"demo"}"#,
+    )
+    .unwrap();
+    let out = run(&["check", "--format", "json"], tmp.path());
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(
+        v["diagnostics"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("schema version")
+    );
+}
+
+#[test]
+fn pack_creates_zip_and_excludes_git() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::create_dir_all(tmp.path().join(".git")).unwrap();
+    fs::write(tmp.path().join(".git/config"), "secret").unwrap();
+    let zip = tmp.path().join("demo.zip");
+    let out = run(&["pack", "--output", zip.to_str().unwrap()], tmp.path());
+    assert!(out.status.success(), "output: {:?}", out);
+    let bytes = fs::read(&zip).unwrap();
+    assert_eq!(&bytes[0..4], &0x0403_4b50u32.to_le_bytes());
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("plugin.json"));
+    assert!(!text.contains(".git/config"));
+}
+
+#[test]
+fn new_with_template_substitutes_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tpl = tmp.path().join("tpl");
+    fs::create_dir(&tpl).unwrap();
+    fs::write(tpl.join("plugin.json"), r#"{"name":"{{name}}"}"#).unwrap();
+    let out = run(
+        &[
+            "new",
+            "demo",
+            "--dir",
+            "demo",
+            "--template",
+            tpl.to_str().unwrap(),
+        ],
+        tmp.path(),
+    );
+    assert!(out.status.success(), "output: {:?}", out);
+    let content = fs::read_to_string(tmp.path().join("demo/plugin.json")).unwrap();
+    assert_eq!(content, r#"{"name":"demo"}"#);
+}
+
+#[test]
+fn compat_reports_transports() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_valid_plugin(tmp.path());
+    fs::write(
+        tmp.path().join("mcp.json"),
+        r#"{"mcpServers":{"s":{"type":"stdio"}}}"#,
+    )
+    .unwrap();
+    let out = run(&["compat"], tmp.path());
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("stdio"), "{}", stdout);
+}

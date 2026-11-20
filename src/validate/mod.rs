@@ -49,6 +49,15 @@ pub fn check_plugin_dir(root: &Path) -> (Report, usize) {
 
     // mcp.json is optional.
     let mcp_path = root.join("mcp.json");
+    if !mcp_path.exists() {
+        report.push(
+            Diagnostic::info(
+                "mcp.json",
+                "not found (a plugin may declare zero MCP servers)",
+            )
+            .with_hint("add mcp.json if the plugin needs MCP servers"),
+        );
+    }
     if mcp_path.exists() {
         match fs::read_to_string(&mcp_path) {
             Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {

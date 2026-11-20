@@ -62,6 +62,21 @@ pub fn check_plugin_json(report: &mut Report, value: &Value) -> Option<String> {
         }
     };
 
+    // plugcheck's rules describe a specific spec version. Other versions may
+    // be valid, but we cannot guarantee the rules still apply.
+    if version != SPEC_VERSION {
+        report.push(
+            Diagnostic::warning(
+                "plugin.json",
+                format!(
+                    "declares schema version `{}` but plugcheck targets `{}`",
+                    version, SPEC_VERSION
+                ),
+            )
+            .with_hint("validation rules may not match the declared specification version"),
+        );
+    }
+
     // --- name (required) ---
     match obj.get("name").and_then(Value::as_str) {
         None => {
@@ -270,6 +285,23 @@ mod tests {
         let mut r = Report::new(std::path::Path::new("."));
         assert_eq!(check_plugin_json(&mut r, &v).as_deref(), Some("1.0.0"));
         assert!(r.ok(), "diagnostics: {:?}", r.diagnostics);
+    }
+
+    #[test]
+    fn other_schema_version_is_warning_only() {
+        let v: Value = serde_json::from_str(
+            r#"{"$schema":"https://agent-plugins.org/schemas/2.0.0/plugin.schema.json","name":"ok"}"#,
+        )
+        .unwrap();
+        let mut r = Report::new(std::path::Path::new("."));
+        assert_eq!(check_plugin_json(&mut r, &v).as_deref(), Some("2.0.0"));
+        assert!(r.ok());
+        assert_eq!(r.warnings(), 4); // 3 recommended fields + version mismatch
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.message.contains("schema version"))
+        );
     }
 
     #[test]

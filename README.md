@@ -58,6 +58,12 @@ Validate an existing plugin (current directory by default):
 plugcheck check /path/to/plugin
 ```
 
+Show informational findings too:
+
+```sh
+plugcheck check --verbose
+```
+
 Get machine-readable output:
 
 ```sh
@@ -67,7 +73,7 @@ plugcheck check --format json
 ```json
 {
   "tool": "plugcheck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "plugin_root": "my-plugin",
   "valid": true,
   "summary": {
@@ -80,6 +86,32 @@ plugcheck check --format json
 ```
 
 Exit code is `0` when the plugin is valid, `1` otherwise.
+Informational findings (shown with `--verbose`) never affect the exit code.
+
+Pack a plugin into a distributable ZIP archive (`.git`, `target`, `node_modules`
+and `*.log` are excluded; the archive is uncompressed and reproducible):
+
+```sh
+plugcheck pack my-plugin -o my-plugin.zip
+```
+
+Re-check automatically while developing (polls every 2 seconds by default):
+
+```sh
+plugcheck watch my-plugin --interval 2
+```
+
+Inspect self-declared client targets and MCP transports:
+
+```sh
+plugcheck compat my-plugin --format json
+```
+
+Start from a local template directory (text files may contain `{{name}}`):
+
+```sh
+plugcheck new my-plugin --template ./templates/basic
+```
 
 A conformant example lives in [`demo-plugin/`](demo-plugin) — it was scaffolded
 by `plugcheck new demo-plugin` and is re-validated on every CI run.
@@ -120,10 +152,12 @@ you share it.
 
 ## Roadmap
 
-- [ ] `plugcheck pack` — bundle a plugin into a distributable archive
-- [ ] `plugcheck watch` — re-check on file changes
-- [ ] Compatibility matrix checks (which clients support your transports)
-- [ ] Plugin template registry (`plugcheck new` with community templates)
+- [x] `plugcheck pack` — bundle a plugin into a distributable archive
+- [x] `plugcheck watch` — re-check on file changes
+- [x] `plugcheck compat` — report declared clients and MCP transports
+- [x] Local plugin templates (`plugcheck new --template <dir>`)
+- [ ] Hosted community template registry
+- [ ] Bundled client capability database for true compatibility matrix checks
 
 ## Contributing
 

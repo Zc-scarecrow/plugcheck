@@ -147,6 +147,55 @@ pub fn scaffold(name: &str, dir: &Path) -> Result<(), ScaffoldError> {
     Ok(())
 }
 
+/// Scaffold from a local template directory.
+///
+/// Text files may contain `{{name}}` placeholders, replaced by the plugin
+/// name. Non-UTF-8 files are copied verbatim. `.git` and `target` are skipped.
+pub fn scaffold_from_template(
+    name: &str,
+    dir: &Path,
+    template: &Path,
+) -> Result<(), ScaffoldError> {
+    validate_name(name).map_err(ScaffoldError::InvalidName)?;
+    if dir.exists() {
+        return Err(ScaffoldError::Io(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("target directory already exists: {}", dir.display()),
+        )));
+    }
+    if !template.is_dir() {
+        return Err(ScaffoldError::Io(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("template directory not found: {}", template.display()),
+        )));
+    }
+    copy_template(template, dir, name)?;
+    Ok(())
+}
+
+fn copy_template(src: &Path, dst: &Path, name: &str) -> io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)?.filter_map(Result::ok) {
+        let from = entry.path();
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        if file_name == ".git" || file_name == "target" {
+            continue;
+        }
+        let to = dst.join(entry.file_name());
+        if from.is_dir() {
+            copy_template(&from, &to, name)?;
+        } else if from.is_file() {
+            let data = fs::read(&from)?;
+            match String::from_utf8(data.clone()) {
+                Ok(text) => fs::write(&to, text.replace("{{name}}", name))?,
+                Err(_) => fs::write(&to, &data)?,
+            }
+        }
+    }
+    Ok(())
+}
+
 fn write(dir: &Path, rel: &str, content: &str) -> io::Result<()> {
     let path = dir.join(rel);
     if let Some(parent) = path.parent() {
@@ -162,7 +211,39 @@ mod tests {
 
     /// Dogfood test: a scaffolded plugin must pass plugcheck's own validator.
     #[test]
-    fn scaffolded_plugin_passes_own_validator() {
+    fn template_substitutes_name_and_copies_tree() {
+        let tmp = tempfile::tempdir().unwrap();
+        let template = tmp.path().join("template");
+        fs::create_dir_all(template.join("skills/hello")).unwrap();
+        fs::write(template.join("plugin.json"), "{\"name\": \"{{name}}\"}").unwrap();
+        fs::write(template.join("skills/hello/SKILL.md"), "name: {{name}}").unwrap();
+        fs::create_dir_all(template.join(".git")).unwrap();
+        fs::write(template.join(".git/config"), "skip").unwrap();
+
+        let target = tmp.path().join("out");
+        scaffold_from_template("demo-plugin", &target, &template).unwrap();
+        assert_eq!(
+            fs::read_to_string(target.join("plugin.json")).unwrap(),
+            "{\"name\": \"demo-plugin\"}"
+        );
+        assert_eq!(
+            fs::read_to_string(target.join("skills/hello/SKILL.md")).unwrap(),
+            "name: demo-plugin"
+        );
+        assert!(!target.join(".git").exists());
+    }
+
+    #[test]
+    fn template_rejects_invalid_name_and_missing_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(scaffold_from_template("Bad", &tmp.path().join("a"), tmp.path()).is_err());
+        assert!(
+            scaffold_from_template("ok", &tmp.path().join("b"), &tmp.path().join("nope")).is_err()
+        );
+    }
+
+    #[test]
+    fn default_scaffold_still_works() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("demo");
         scaffold("demo-plugin", &dir).unwrap();
